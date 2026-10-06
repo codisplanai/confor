@@ -45,3 +45,29 @@ Aplicação web estática (100% *client-side*) para conciliação contábil entr
 ```bash
 npm test
 ```
+
+## Publicação e Releases Automáticas (SemVer)
+
+O projeto segue estritamente o versionamento semântico **SemVer (`vX.Y.Z`)**:
+- **Patch (v1.0.X):** Correções de bugs, pequenas melhorias e ajustes retrocompatíveis.
+- **Minor (v1.X.0):** Novas funcionalidades e relatórios retrocompatíveis.
+- **Major (vX.0.0):** Grandes alterações estruturais ou mudanças que quebram compatibilidade.
+
+### Opção 1: Pelo GitHub Actions (Recomendado)
+1. Vá até a aba **Actions** no GitHub.
+2. Selecione o workflow **Release Automática SemVer**.
+3. Clique em **Run workflow**, escolha o tipo (`patch`, `minor` ou `major`) e confirme.
+4. O workflow executará os testes, criará o commit de versão, a tag `vX.Y.Z` e publicará a [GitHub Release](https://github.com/codisplanai/confor/releases) automaticamente com changelog gerado.
+
+### Opção 2: Pelo Terminal Local
+Você também pode disparar releases diretamente pelo terminal:
+```bash
+# Interativo (pergunta se quer patch, minor ou major)
+npm run release
+
+# Ou diretamente pelo tipo desejado:
+npm run release:patch
+npm run release:minor
+npm run release:major
+```
+O script executa os testes automatizados, valida o build, incrementa a versão no `package.json`, cria a tag Git anotada e envia para o GitHub.

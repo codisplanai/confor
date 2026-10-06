@@ -1,0 +1,110 @@
+name: Release Automática SemVer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Tipo de versão SemVer'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  bump-and-tag:
+    name: Gerar Release SemVer
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar testes de paridade
+        run: npm test
+
+      - name: Executar build de produção
+        run: npm run build
+
+      - name: Configurar Git bot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Incrementar SemVer (${{ inputs.version_type }})
+        id: bump
+        run: |
+          NEW_TAG=$(npm version ${{ inputs.version_type }} -m "chore(release): %s [skip ci]")
+          echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "Versão criada: $NEW_TAG"
+
+      - name: Enviar commit e tag para o repositório
+        run: |
+          git push origin main
+          git push origin ${{ steps.bump.outputs.tag }}
+
+      - name: Criar GitHub Release Oficial
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.bump.outputs.tag }}
+          name: Release ${{ steps.bump.outputs.tag }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+  release-on-tag-push:
+    name: Publicar Release para Tag Pushed
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar testes de paridade
+        run: npm test
+
+      - name: Executar build de produção
+        run: npm run build
+
+      - name: Criar GitHub Release Oficial
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
