@@ -8,6 +8,8 @@ import { detectKind, MESES } from './core/metadata.js';
 import { analyze, AppError } from './core/pipeline.js';
 import { DEFAULT_ACCOUNT } from './core/parseBalancete.js';
 import { buildWorkbook, nomeArquivo } from './export/excel.js';
+import { logger } from './core/logger.js';
+import { initLoggerView } from './ui/loggerView.js';
 
 /* ------------------------------ PWA ------------------------------ */
 if ('serviceWorker' in navigator) {
@@ -140,6 +142,8 @@ async function addFiles(list) {
   state.files.push(...novos);
   renderFiles();
 
+  logger.info('UPLOAD', `Arquivos recebidos: ${novos.map((n) => `${n.file.name} (${fmtBytes(n.file.size)})`).join(', ')}`);
+
   // Detecção rápida do tipo (apenas as 2 primeiras páginas)
   for (const item of novos) {
     try {
@@ -147,8 +151,10 @@ async function addFiles(list) {
       const buf = await item.file.arrayBuffer();
       const pages = await extractPages(buf, pdfjs, null, 2);
       item.kind = detectKind(pages);
+      logger.info('UPLOAD', `"${item.file.name}" identificado preliminarmente como: ${KIND_LABEL[item.kind]}`);
     } catch (e) {
       item.kind = 'erro';
+      logger.error('UPLOAD', `Falha ao inspecionar "${item.file.name}"`, { erro: e.message });
     }
     renderFiles();
   }
@@ -174,6 +180,7 @@ function renderFiles() {
             title: 'Remover arquivo',
             'aria-label': `Remover ${it.file.name}`,
             onclick: () => {
+              logger.info('UPLOAD', `Arquivo removido pelo usuário: ${it.file.name}`);
               state.files = state.files.filter((x) => x.id !== it.id);
               showError('');
               renderFiles();
@@ -218,12 +225,15 @@ $('#btn-process').addEventListener('click', async () => {
     state.meta = { ...result.meta };
     fillReview(result);
     showStatus('');
+    logger.success('PIPELINE', 'Processamento e conciliação concluídos com sucesso!');
     setStep(2);
   } catch (e) {
     showStatus('');
-    if (e instanceof AppError) showError(e.message);
-    else {
+    if (e instanceof AppError) {
+      showError(e.message);
+    } else {
       console.error(e);
+      logger.error('SISTEMA', 'Erro inesperado durante o processamento', { mensagem: e.message, stack: e.stack });
       showError('Ocorreu um erro inesperado ao processar os PDFs. Confira se são os relatórios corretos e tente novamente.');
     }
   } finally {
@@ -270,12 +280,14 @@ $('#btn-continue').addEventListener('click', () => {
     ano,
     emissao: $('#meta-emissao').value.trim(),
   };
+  logger.info('METADADOS', `Metadados confirmados: ${state.meta.empresa} (${state.meta.mes}/${state.meta.ano})`);
   renderResults(state.result, state.meta);
   setStep(3);
 });
 
 /* ------------------------------ Resultado ------------------------------ */
 $('#btn-new').addEventListener('click', () => {
+  logger.info('SESSÃO', 'Iniciando nova conciliação (limpando estado anterior).');
   state.files = [];
   state.result = null;
   state.meta = null;
@@ -288,6 +300,7 @@ $('#btn-download').addEventListener('click', async () => {
   const btn = $('#btn-download');
   btn.disabled = true;
   try {
+    logger.info('EXPORTAÇÃO', 'Gerando arquivo Excel da conciliação…');
     const mod = await import('exceljs');
     const ExcelJS = mod.default || mod;
     const wb = buildWorkbook(ExcelJS, state.result, state.meta);
@@ -296,14 +309,17 @@ $('#btn-download').addEventListener('click', async () => {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const url = URL.createObjectURL(blob);
-    const a = h('a', { href: url, download: nomeArquivo(state.meta) });
+    const fileName = nomeArquivo(state.meta);
+    const a = h('a', { href: url, download: fileName });
     document.body.append(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    toast(`Planilha gerada: ${nomeArquivo(state.meta)}`);
+    logger.success('EXPORTAÇÃO', `Planilha gerada e baixada com sucesso: ${fileName}`);
+    toast(`Planilha gerada: ${fileName}`);
   } catch (e) {
     console.error(e);
+    logger.error('EXPORTAÇÃO', 'Falha ao gerar planilha Excel', { erro: e.message, stack: e.stack });
     toast('Não foi possível gerar a planilha. Tente novamente.', true);
   } finally {
     btn.disabled = false;
@@ -311,3 +327,4 @@ $('#btn-download').addEventListener('click', async () => {
 });
 
 renderFiles();
+initLoggerView();
