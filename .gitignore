@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Production build
+dist/
+dist-ssr/
+
+# Local / Environment
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test output & binaries
+tests/out/
+*.xlsx
+~$*.xlsx
+*.pdf
+Amostras/
+__pycache__/
+*.py[cod]
+
+# System / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

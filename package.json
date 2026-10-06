@@ -1,0 +1,20 @@
+{
+  "name": "conciliacao-contabil",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Conciliação Contábil de Fornecedores: Balancete Analítico x Conta Corrente (processamento 100% no navegador)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node tests/parity.test.mjs"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

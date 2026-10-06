@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conciliação Contábil de Fornecedores | Balancete x Conta Corrente</title>
+    <meta
+      name="description"
+      content="Concilie o Balancete Analítico com o Conta Corrente de Fornecedores em segundos. Envie os PDFs, veja o diagnóstico das divergências e baixe a planilha Excel. Processamento 100% no seu navegador."
+    />
+    <meta name="theme-color" content="#1B365D" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Aplica o tema salvo antes da pintura, evitando "flash" de tema errado.
+      (function () {
+        try {
+          var t = localStorage.getItem('tema');
+          if (!t) t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="topbar__inner">
+        <a class="brand" href="/" aria-label="Conciliação Contábil, início">
+          <span class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="22" height="22" fill="none">
+              <path d="M6 8h20M6 16h12M6 24h20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+              <circle cx="24" cy="16" r="3.4" fill="currentColor" />
+            </svg>
+          </span>
+          <span class="brand__text">
+            <strong>Conciliação Contábil</strong>
+            <small>Fornecedores</small>
+          </span>
+        </a>
+
+        <ol class="stepper" id="stepper" aria-label="Etapas">
+          <li class="stepper__item is-active" data-step="1"><span>1</span> Arquivos</li>
+          <li class="stepper__item" data-step="2"><span>2</span> Conferência</li>
+          <li class="stepper__item" data-step="3"><span>3</span> Resultado</li>
+        </ol>
+
+        <button class="icon-btn" id="theme-toggle" type="button" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="container" id="app">
+      <!-- Etapa 1: Arquivos -->
+      <section class="step is-active" id="step-upload" aria-labelledby="titulo-principal">
+        <div class="hero">
+          <span class="pill">Balancete Analítico × Conta Corrente</span>
+          <h1 id="titulo-principal">Conciliação de Fornecedores em segundos</h1>
+          <p>
+            Envie os dois relatórios em PDF. O sistema cruza cada fornecedor, diagnostica as divergências e
+            gera a planilha Excel de conferência.
+          </p>
+        </div>
+
+        <div class="card card--upload">
+          <label class="dropzone" id="dropzone" for="file-input">
+            <input id="file-input" type="file" accept="application/pdf,.pdf" multiple hidden />
+            <span class="dropzone__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4M12 4l-4 4M12 4l4 4" />
+                <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+              </svg>
+            </span>
+            <span class="dropzone__title">Arraste os 2 PDFs aqui</span>
+            <span class="dropzone__sub">ou <u>clique para selecionar</u>. A ordem não importa: o tipo de cada relatório é detectado automaticamente.</span>
+          </label>
+
+          <ul class="file-list" id="file-list" aria-live="polite"></ul>
+
+          <div class="expect">
+            <div class="expect__item" id="expect-balancete">
+              <span class="dot"></span>
+              <div><strong>Balancete Analítico</strong><small>Relatório com Saldo Inicial, Mov. Débito, Mov. Crédito e Saldo Final</small></div>
+            </div>
+            <div class="expect__item" id="expect-cc">
+              <span class="dot"></span>
+              <div><strong>Conta Corrente Fornecedores</strong><small>Relatório "Saldo C/C Fornecedores do mês"</small></div>
+            </div>
+          </div>
+
+          <details class="advanced">
+            <summary>Opções avançadas</summary>
+            <div class="field field--inline">
+              <label for="account-code">Código da conta de Fornecedores no Balancete</label>
+              <input id="account-code" class="input input--mono" type="text" value="2101010000" inputmode="numeric" maxlength="12" />
+            </div>
+          </details>
+
+          <div class="status" id="status" role="status" aria-live="polite" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="status-text">Processando…</span>
+          </div>
+          <div class="alert alert--error" id="upload-error" role="alert" hidden></div>
+
+          <div class="actions">
+            <button class="btn btn--primary" id="btn-process" type="button" disabled>
+              Processar PDFs
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <p class="privacy">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+          Seus arquivos são processados no seu navegador e <strong>não são enviados</strong> a nenhum servidor.
+        </p>
+      </section>
+
+      <!-- Etapa 2: Conferência -->
+      <section class="step" id="step-review" aria-labelledby="titulo-review">
+        <div class="section-head">
+          <h2 id="titulo-review">Confira os dados da empresa</h2>
+          <p>Identificamos estas informações nos cabeçalhos dos PDFs. Corrija o que for necessário: elas aparecem na planilha.</p>
+        </div>
+
+        <div class="grid grid--2">
+          <form class="card" id="meta-form" autocomplete="off">
+            <div class="field field--wide">
+              <label for="meta-empresa">Empresa</label>
+              <input class="input" id="meta-empresa" name="empresa" type="text" />
+            </div>
+            <div class="field">
+              <label for="meta-codigo">Código</label>
+              <input class="input" id="meta-codigo" name="codigo" type="text" />
+            </div>
+            <div class="field">
+              <label for="meta-cnpj">CNPJ</label>
+              <input class="input input--mono" id="meta-cnpj" name="cnpj" type="text" />
+            </div>
+            <div class="field">
+              <label for="meta-mes">Mês de competência</label>
+              <select class="input" id="meta-mes" name="mes"></select>
+            </div>
+            <div class="field">
+              <label for="meta-ano">Ano</label>
+              <input class="input input--mono" id="meta-ano" name="ano" type="text" inputmode="numeric" maxlength="4" />
+            </div>
+            <div class="field">
+              <label for="meta-emissao">Data de emissão</label>
+              <input class="input input--mono" id="meta-emissao" name="emissao" type="text" placeholder="dd/mm/aaaa" />
+            </div>
+          </form>
+
+          <div class="card">
+            <h3 class="card__title">Verificações de integridade</h3>
+            <ul class="checks" id="checks"></ul>
+            <div id="review-warnings"></div>
+          </div>
+        </div>
+
+        <div class="actions actions--split">
+          <button class="btn btn--ghost" id="btn-back" type="button">← Voltar</button>
+          <button class="btn btn--primary" id="btn-continue" type="button">
+            Ver resultado
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Etapa 3: Resultado -->
+      <section class="step" id="step-result" aria-labelledby="titulo-result">
+        <div class="result-head">
+          <div>
+            <h2 id="titulo-result">Resultado da conciliação</h2>
+            <p class="result-head__meta" id="result-meta"></p>
+          </div>
+          <div class="result-head__actions">
+            <button class="btn btn--ghost" id="btn-new" type="button">Nova conciliação</button>
+            <button class="btn btn--primary" id="btn-download" type="button">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M12 15l-4-4M12 15l4-4M5 20h14" /></svg>
+              Baixar Excel
+            </button>
+          </div>
+        </div>
+
+        <div class="kpis" id="kpis"></div>
+
+        <div class="grid grid--charts">
+          <div class="card">
+            <h3 class="card__title">Distribuição dos fornecedores</h3>
+            <div class="donut-wrap" id="chart-donut"></div>
+          </div>
+          <div class="card">
+            <h3 class="card__title">Causa-raiz das divergências</h3>
+            <div id="chart-causas"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card__title">Parecer e notas técnicas</h3>
+          <ol class="notes" id="notes"></ol>
+        </div>
+
+        <div class="card card--table">
+          <div class="tabs" id="tabs" role="tablist" aria-label="Detalhamento"></div>
+          <div id="table-host"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Conciliação Contábil · Fornecedores</span>
+      <span>Os dados não saem do seu computador.</span>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
