@@ -79,3 +79,9 @@ export function sumCredito(suppliers) {
   for (const s of suppliers.values()) t += s.movCredito;
   return round2(t);
 }
+
+export function sumSaldoFinal(suppliers) {
+  let t = 0;
+  for (const s of suppliers.values()) t += s.saldoFinal;
+  return round2(t);
+}

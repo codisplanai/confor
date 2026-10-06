@@ -78,13 +78,13 @@ if (hasPdfs) {
     { name: 'cprccforn.pdf', data: load(pdfCC) },
     { name: 'BALANCO.PDF', data: load(pdfBal) },
   ];
-  r = await analyze(files, pdfjs);
+  r = await analyze(files, pdfjs, { modo: 'credito' });
 } else {
   const bal = parseBalancete(golden.linhasBalancete);
   const cc = parseContaCorrente(golden.linhasContaCorrente);
-  const grupos = conciliar(bal.suppliers, cc.suppliers);
-  const resumo = buildSummary(bal.suppliers, cc.suppliers, grupos);
-  const notas = buildNotes(bal.suppliers, cc.suppliers, grupos, resumo);
+  const grupos = conciliar(bal.suppliers, cc.suppliers, { modo: 'credito' });
+  const resumo = buildSummary(bal.suppliers, cc.suppliers, grupos, { modo: 'credito' });
+  const notas = buildNotes(bal.suppliers, cc.suppliers, grupos, resumo, { modo: 'credito' });
   const { meta, warnings } = extractMetadata(golden.linhasBalancete, golden.linhasContaCorrente);
   r = {
     bal: bal.suppliers,

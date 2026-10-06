@@ -1,12 +1,22 @@
 import { h, clear, $ } from './dom.js';
 import { fmtBRL } from '../core/money.js';
 import { createTable } from './table.js';
+import { logger } from '../core/logger.js';
 
-const GRUPOS = [
+const GRUPOS_CREDITO = [
   { key: 'batimentos', label: 'Batimentos exatos', color: 'hsl(152 62% 44%)' },
   { key: 'divergencias', label: 'Divergência de valores', color: 'hsl(352 78% 58%)' },
   { key: 'somenteBalCred', label: 'Somente no Balancete (c/ crédito)', color: 'hsl(40 94% 55%)' },
   { key: 'somenteBalSemCred', label: 'Somente no Balancete (sem crédito)', color: 'hsl(215 20% 58%)' },
+  { key: 'somenteCC', label: 'Somente no Conta Corrente', color: 'hsl(262 70% 66%)' },
+];
+
+const GRUPOS_SALDO_FINAL = [
+  { key: 'batimentos', label: 'Batimentos exatos', color: 'hsl(152 62% 44%)' },
+  { key: 'divergencias', label: 'Divergência de valores', color: 'hsl(352 78% 58%)' },
+  { key: 'somenteBalCredor', label: 'Saldo Credor em aberto', color: 'hsl(40 94% 55%)' },
+  { key: 'somenteBalDevedor', label: 'Saldo Devedor (Adiantamento)', color: 'hsl(199 89% 58%)' },
+  { key: 'somenteBalZerado', label: 'Saldo Zerado / Quitado', color: 'hsl(215 20% 58%)' },
   { key: 'somenteCC', label: 'Somente no Conta Corrente', color: 'hsl(262 70% 66%)' },
 ];
 
@@ -15,15 +25,16 @@ const nfInt = new Intl.NumberFormat('pt-BR');
 /* ------------------------------ KPIs ------------------------------ */
 function renderKpis(r) {
   const s = r.resumo;
+  const isSaldo = (r.modo || 'saldoFinal') === 'saldoFinal';
   const total = r.grupos.base.length;
   const pct = total ? (s.contagens.batimentos / total) * 100 : 0;
   const fechou = Math.abs(s.prova.residual) < 0.01;
 
   const cards = [
     {
-      label: 'Mov. Crédito (Balancete)',
+      label: isSaldo ? 'Saldo Final (4ª Coluna Balancete)' : 'Mov. Crédito (3ª Coluna Balancete)',
       value: fmtBRL(s.totBal),
-      sub: `${nfInt.format(s.qtdFornecedores)} fornecedores`,
+      sub: `${nfInt.format(s.qtdFornecedores)} contas analíticas`,
       color: 'hsl(212 92% 58%)',
     },
     {
@@ -35,7 +46,7 @@ function renderKpis(r) {
     {
       label: 'Diferença global',
       value: fmtBRL(s.difGlobal),
-      sub: 'Balancete − Conta Corrente',
+      sub: isSaldo ? 'Saldo Final − Conta Corrente' : 'Mov. Crédito − Conta Corrente',
       color: Math.abs(s.difGlobal) < 0.01 ? 'hsl(152 62% 44%)' : 'hsl(352 78% 58%)',
       seal: fechou
         ? { ok: true, text: '✓ Prova fecha em R$ 0,00' }
@@ -66,6 +77,8 @@ function renderKpis(r) {
 
 /* ------------------------------ Donut ------------------------------ */
 function renderDonut(r) {
+  const isSaldo = (r.modo || 'saldoFinal') === 'saldoFinal';
+  const gruposDef = isSaldo ? GRUPOS_SALDO_FINAL : GRUPOS_CREDITO;
   const total = r.grupos.base.length || 1;
   const R = 70;
   const C = 2 * Math.PI * R;
@@ -85,8 +98,9 @@ function renderDonut(r) {
 
   const segs = [];
   let offset = 0;
-  for (const g of GRUPOS) {
-    const n = r.grupos[g.key].length;
+  for (const g of gruposDef) {
+    const list = r.grupos[g.key] || [];
+    const n = list.length;
     if (!n) continue;
     const len = (n / total) * C;
     const c = document.createElementNS(NS, 'circle');
@@ -115,16 +129,18 @@ function renderDonut(r) {
   const legend = h(
     'ul',
     { class: 'legend' },
-    GRUPOS.map((g) => {
-      const n = r.grupos[g.key].length;
-      return h(
-        'li',
-        {},
-        h('span', { class: 'sw', style: `background:${g.color}` }),
-        g.label,
-        h('span', { class: 'n' }, nfInt.format(n)),
-      );
-    }),
+    gruposDef
+      .filter((g) => (r.grupos[g.key] || []).length > 0)
+      .map((g) => {
+        const n = (r.grupos[g.key] || []).length;
+        return h(
+          'li',
+          {},
+          h('span', { class: 'sw', style: `background:${g.color}` }),
+          g.label,
+          h('span', { class: 'n' }, nfInt.format(n)),
+        );
+      }),
   );
 
   clear($('#chart-donut')).append(
@@ -161,59 +177,89 @@ function renderCausas(r) {
 }
 
 /* ------------------------------ Tabelas ------------------------------ */
-const STATUS_LABEL = { ok: 'Quitado no mês', diff: 'Saldo credor em aberto', alerta: 'Saldo devedor' };
+const STATUS_LABEL = {
+  ok: 'Quitado no mês (Saldo Zero)',
+  diff: 'Saldo credor em aberto',
+  alerta: 'Saldo devedor / Adiantamento',
+};
 
 function tabelas(r) {
   const o = r.ordenado;
+  const isSaldo = (r.modo || 'saldoFinal') === 'saldoFinal';
+
   const T = {
     cod: { key: 'cod', label: 'Código' },
     cnpj: { key: 'cnpj', label: 'CNPJ / CPF' },
     nome: { key: 'nome', label: 'Fornecedor' },
     classif: { key: 'classif', label: 'Classificação' },
-    balCred: { key: 'balCred', label: 'Mov. Crédito (Bal)', kind: 'money', cls: () => '' },
-    ccVal: { key: 'ccVal', label: 'Saldo Credor (CC)', kind: 'money', cls: () => '' },
-    diff: { key: 'diff', label: 'Diferença', kind: 'money', cls: (x) => (Math.abs(x.diff) > 0.01 ? 'pos-bad' : '') },
     ini: { key: 'ini', label: 'Saldo Inicial', kind: 'money' },
     deb: { key: 'deb', label: 'Mov. Débito', kind: 'money', cls: () => '' },
-    fim: { key: 'fim', label: 'Saldo Final', kind: 'money' },
+    balCred: { key: 'balCred', label: 'Mov. Crédito', kind: 'money', cls: () => '' },
+    fim: { key: 'fim', label: isSaldo ? 'Saldo Final (4ª Col)' : 'Saldo Final', kind: 'money' },
+    ccVal: { key: 'ccVal', label: 'Saldo Credor (CC)', kind: 'money', cls: () => '' },
+    diff: {
+      key: 'diff',
+      label: isSaldo ? 'Diferença (SF - CC)' : 'Diferença (Créd - CC)',
+      kind: 'money',
+      cls: (x) => (Math.abs(x.diff) > 0.01 ? 'pos-bad' : ''),
+    },
   };
   const searchKeys = ['cod', 'nome', 'cnpj'];
 
-  const tabs = [
-    {
-      id: 'divergencias',
-      label: 'Divergências',
-      rows: o.divergencias,
-      columns: [
+  const tabs = [];
+
+  // 1. Aba Divergências
+  const colDiverg = isSaldo
+    ? [
+        T.cod, T.cnpj, T.nome, T.ini, T.deb, T.balCred, T.fim, T.ccVal, T.diff,
+        { key: 'diffCred', label: 'Dif. vs Mov. Créd', kind: 'money' },
+        { key: 'diag', label: 'Diagnóstico contábil', kind: 'wrap' },
+      ]
+    : [
         T.cod, T.cnpj, T.nome, T.balCred, T.ccVal, T.diff, T.ini, T.deb, T.fim,
         { key: 'diffFim', label: 'Dif. vs Saldo Final', kind: 'money' },
         { key: 'diag', label: 'Diagnóstico contábil', kind: 'wrap' },
-      ],
-      filter: { label: 'Causa', get: (x) => x.categoria },
-      totals: ['balCred', 'ccVal', 'diff', 'ini', 'deb', 'fim', 'diffFim'],
-      totalLabel: 'Total divergências',
-    },
-    {
-      id: 'somenteBal',
-      label: 'Somente no Balancete',
-      rows: o.somenteBalCred,
-      columns: [
-        T.cod, T.nome, T.balCred, T.deb, T.ini, T.fim,
-        { key: 'status', label: 'Status ao término do mês', kind: 'tag', tag: (x) => ({ text: x.status, type: x.statusTipo }) },
-      ],
-      filter: { label: 'Status', get: (x) => STATUS_LABEL[x.statusTipo] },
-      totals: ['balCred', 'deb', 'ini', 'fim'],
-      totalLabel: 'Total somente no Balancete',
-    },
-    {
-      id: 'batimentos',
-      label: 'Batimentos exatos',
-      rows: o.batimentos,
-      columns: [T.cod, T.cnpj, T.nome, T.balCred, T.ccVal, T.ini, T.deb, T.fim],
-      totals: ['balCred', 'ccVal', 'ini', 'deb', 'fim'],
-      totalLabel: 'Total batimentos',
-    },
-  ];
+      ];
+
+  tabs.push({
+    id: 'divergencias',
+    label: 'Divergências',
+    rows: o.divergencias,
+    columns: colDiverg,
+    filter: { label: 'Causa', get: (x) => x.categoria },
+    totals: isSaldo ? ['ini', 'deb', 'balCred', 'fim', 'ccVal', 'diff'] : ['balCred', 'ccVal', 'diff', 'ini', 'deb', 'fim'],
+    totalLabel: 'Total divergências',
+  });
+
+  // 2. Aba Batimentos Exatos
+  tabs.push({
+    id: 'batimentos',
+    label: 'Batimentos exatos',
+    rows: o.batimentos,
+    columns: [T.cod, T.cnpj, T.nome, T.ini, T.deb, T.balCred, T.fim, T.ccVal],
+    totals: ['ini', 'deb', 'balCred', 'fim', 'ccVal'],
+    totalLabel: 'Total batimentos',
+  });
+
+  // 3. Aba Somente no Balancete
+  const rowsBalancete = isSaldo
+    ? [...(o.somenteBalCredor || []), ...(o.somenteBalDevedor || []), ...(o.somenteBalZerado || [])]
+    : o.somenteBalCred;
+
+  tabs.push({
+    id: 'somenteBal',
+    label: 'Somente no Balancete',
+    rows: rowsBalancete,
+    columns: [
+      T.cod, T.nome, T.ini, T.deb, T.balCred, T.fim,
+      { key: 'status', label: 'Posição no fechamento', kind: 'tag', tag: (x) => ({ text: x.status, type: x.statusTipo }) },
+    ],
+    filter: { label: 'Status', get: (x) => STATUS_LABEL[x.statusTipo] || x.status },
+    totals: ['ini', 'deb', 'balCred', 'fim'],
+    totalLabel: 'Total somente no Balancete',
+  });
+
+  // 4. Somente no Conta Corrente (se houver)
   if (r.grupos.somenteCC.length) {
     tabs.push({
       id: 'somenteCC',
@@ -224,23 +270,29 @@ function tabelas(r) {
       totalLabel: 'Total',
     });
   }
+
+  // 5. Base Consolidada Geral
   const SIT_TIPO = {
     batimento: 'ok',
     divergencia: 'diff',
     somenteBalCred: 'alerta',
+    somenteBalCredor: 'diff',
+    somenteBalDevedor: 'alerta',
+    somenteBalZerado: 'neutral',
     somenteBalSemCred: 'neutral',
     somenteCC: 'diff',
   };
+
   tabs.push({
     id: 'base',
     label: 'Base consolidada',
     rows: r.grupos.base,
     columns: [
-      T.cod, T.cnpj, T.classif, T.nome, T.balCred, T.ccVal, T.diff, T.ini, T.deb, T.fim,
-      { key: 'situacao', label: 'Situação', kind: 'tag', tag: (x) => ({ text: x.situacao, type: SIT_TIPO[x.grupo] }) },
+      T.cod, T.cnpj, T.classif, T.nome, T.ini, T.deb, T.balCred, T.fim, T.ccVal, T.diff,
+      { key: 'situacao', label: 'Situação', kind: 'tag', tag: (x) => ({ text: x.situacao, type: SIT_TIPO[x.grupo] || 'neutral' }) },
     ],
     filter: { label: 'Situação', get: (x) => x.situacao },
-    totals: ['balCred', 'ccVal', 'diff', 'ini', 'deb', 'fim'],
+    totals: ['ini', 'deb', 'balCred', 'fim', 'ccVal', 'diff'],
     totalLabel: 'Total geral',
   });
 
@@ -289,9 +341,54 @@ export function renderResults(r, meta) {
     .filter(Boolean)
     .join('  ·  ');
 
-  renderKpis(r);
-  renderDonut(r);
-  renderCausas(r);
-  clear($('#notes')).append(...r.notas.map((n) => h('li', {}, n)));
-  renderTabs(r);
+  function updateModeUI(modo) {
+    const isSaldo = modo === 'saldoFinal';
+    const descEl = $('#result-mode-desc');
+    if (descEl) {
+      descEl.textContent = isSaldo
+        ? 'Exibindo conciliação pela 4ª coluna (Saldo Final acumulado x Saldo Credor C/C)'
+        : 'Exibindo conciliação pela 3ª coluna (Mov. Crédito bruto x Saldo Credor C/C)';
+    }
+
+    const pills = document.querySelectorAll('#mode-selector-step3 .segmented-pill');
+    pills.forEach((p) => {
+      const active = p.dataset.mode === modo;
+      p.classList.toggle('is-active', active);
+      p.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
+  }
+
+  function applyMode(modo) {
+    if (r.modes && r.modes[modo]) {
+      r.modo = modo;
+      const target = r.modes[modo];
+      r.grupos = target.grupos;
+      r.ordenado = target.ordenado;
+      r.resumo = target.resumo;
+      r.notas = target.notas;
+      logger.info('MODO', `Visualização alternada instantaneamente para: ${modo === 'saldoFinal' ? 'Saldo Final (4ª Coluna)' : 'Movimento Crédito (3ª Coluna)'}`);
+    }
+
+    updateModeUI(r.modo || 'saldoFinal');
+    renderKpis(r);
+    renderDonut(r);
+    renderCausas(r);
+    clear($('#notes')).append(...r.notas.map((n) => h('li', {}, n)));
+    renderTabs(r);
+  }
+
+  // Registra eventos no seletor de modalidade de Step 3
+  const selectorStep3 = $('#mode-selector-step3');
+  if (selectorStep3) {
+    selectorStep3.querySelectorAll('.segmented-pill').forEach((btn) => {
+      btn.onclick = () => {
+        const modo = btn.dataset.mode;
+        if (modo !== r.modo) {
+          applyMode(modo);
+        }
+      };
+    });
+  }
+
+  applyMode(r.modo || 'saldoFinal');
 }

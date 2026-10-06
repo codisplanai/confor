@@ -114,6 +114,25 @@
             </div>
           </div>
 
+          <div class="mode-selector-wrap">
+            <label class="mode-selector-label">Critério de conferência do Balancete:</label>
+            <div class="segmented-cards" id="mode-selector-step1" role="radiogroup" aria-label="Modalidade de conferência">
+              <button type="button" class="segmented-card is-active" data-mode="saldoFinal" role="radio" aria-checked="true">
+                <span class="segmented-card__head">
+                  <span class="badge badge--ok">Padrão contábil</span>
+                  <strong>4ª Coluna: Saldo Final</strong>
+                </span>
+                <span class="segmented-card__desc">Cruza a posição de títulos em aberto acumulada com o Saldo Credor do C/C</span>
+              </button>
+              <button type="button" class="segmented-card" data-mode="credito" role="radio" aria-checked="false">
+                <span class="segmented-card__head">
+                  <strong>3ª Coluna: Mov. Crédito</strong>
+                </span>
+                <span class="segmented-card__desc">Cruza as compras brutas escrituradas no mês com o Saldo Credor do C/C</span>
+              </button>
+            </div>
+          </div>
+
           <details class="advanced">
             <summary>Opções avançadas</summary>
             <div class="field field--inline">
@@ -205,6 +224,26 @@
             <button class="btn btn--primary" id="btn-download" type="button">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M12 15l-4-4M12 15l4-4M5 20h14" /></svg>
               Baixar Excel
+            </button>
+          </div>
+        <div class="result-mode-bar card card--mode">
+          <div class="result-mode-bar__info">
+            <span class="result-mode-bar__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            </span>
+            <div>
+              <span class="result-mode-bar__title">Critério de Conferência Ativo</span>
+              <span class="result-mode-bar__sub" id="result-mode-desc">Exibindo conciliação pela 4ª coluna (Saldo Final)</span>
+            </div>
+          </div>
+          <div class="segmented-pills" id="mode-selector-step3" role="radiogroup" aria-label="Alternar modalidade de conferência">
+            <button type="button" class="segmented-pill is-active" data-mode="saldoFinal" role="radio" aria-checked="true">
+              4ª Coluna: Saldo Final
+            </button>
+            <button type="button" class="segmented-pill" data-mode="credito" role="radio" aria-checked="false">
+              3ª Coluna: Mov. Crédito
             </button>
           </div>
         </div>

@@ -58,6 +58,7 @@ const state = {
   files: [], // { id, file, kind: 'pending'|'balancete'|'contaCorrente'|'desconhecido'|'erro' }
   result: null,
   meta: null,
+  selectedMode: 'saldoFinal', // 'saldoFinal' (4ª coluna) | 'credito' (3ª coluna)
 };
 let seq = 0;
 
@@ -210,6 +211,23 @@ function renderFiles() {
 
 const ok2 = (k) => k === 'balancete' || k === 'contaCorrente';
 
+/* ------------------------------ Seletor de Modo (Etapa 1) ------------------------------ */
+const modeCards = $$('#mode-selector-step1 .segmented-card');
+modeCards.forEach((card) => {
+  card.addEventListener('click', () => {
+    state.selectedMode = card.dataset.mode;
+    modeCards.forEach((c) => {
+      const active = c.dataset.mode === state.selectedMode;
+      c.classList.toggle('is-active', active);
+      c.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
+    logger.info(
+      'CONFIG',
+      `Critério de conferência selecionado: ${state.selectedMode === 'saldoFinal' ? '4ª Coluna (Saldo Final)' : '3ª Coluna (Mov. Crédito)'}`,
+    );
+  });
+});
+
 $('#btn-process').addEventListener('click', async () => {
   showError('');
   const btn = $('#btn-process');
@@ -220,7 +238,7 @@ $('#btn-process').addEventListener('click', async () => {
     const files = [];
     for (const it of state.files) files.push({ name: it.file.name, data: await it.file.arrayBuffer() });
     const account = ($('#account-code').value || DEFAULT_ACCOUNT).replace(/\D/g, '') || DEFAULT_ACCOUNT;
-    const result = await analyze(files, pdfjs, { account, onProgress: showStatus });
+    const result = await analyze(files, pdfjs, { account, modo: state.selectedMode, onProgress: showStatus });
     state.result = result;
     state.meta = { ...result.meta };
     fillReview(result);

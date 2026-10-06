@@ -1,6 +1,6 @@
 import { extractPages } from './pdfText.js';
 import { detectKind, extractMetadata } from './metadata.js';
-import { parseBalancete, sumCredito, DEFAULT_ACCOUNT } from './parseBalancete.js';
+import { parseBalancete, sumCredito, sumSaldoFinal, DEFAULT_ACCOUNT } from './parseBalancete.js';
 import { parseContaCorrente, sumSaldoCredor } from './parseContaCorrente.js';
 import { conciliar, ordenar, buildSummary, buildNotes } from './conciliacao.js';
 import { round2, fmtBRL } from './money.js';
@@ -100,16 +100,49 @@ export async function analyze(files, pdfjs, opts = {}) {
 
   say('Conciliando…');
   logger.info('CONCILIAÇÃO', 'Iniciando cruzamento e diagnóstico contábil registro a registro…');
-  const grupos = conciliar(bal.suppliers, cc.suppliers);
-  const resumo = buildSummary(bal.suppliers, cc.suppliers, grupos);
-  const notas = buildNotes(bal.suppliers, cc.suppliers, grupos, resumo);
+
+  const activeModo = opts.modo === 'credito' ? 'credito' : 'saldoFinal';
+
+  // Executa a conciliação no modo Saldo Final (4ª coluna)
+  const gruposSaldo = conciliar(bal.suppliers, cc.suppliers, { modo: 'saldoFinal' });
+  const resumoSaldo = buildSummary(bal.suppliers, cc.suppliers, gruposSaldo, { modo: 'saldoFinal' });
+  const notasSaldo = buildNotes(bal.suppliers, cc.suppliers, gruposSaldo, resumoSaldo, { modo: 'saldoFinal' });
+
+  // Executa também no modo Movimento Crédito (3ª coluna) para permitir alternância instantânea
+  const gruposCred = conciliar(bal.suppliers, cc.suppliers, { modo: 'credito' });
+  const resumoCred = buildSummary(bal.suppliers, cc.suppliers, gruposCred, { modo: 'credito' });
+  const notasCred = buildNotes(bal.suppliers, cc.suppliers, gruposCred, resumoCred, { modo: 'credito' });
+
+  const active = activeModo === 'saldoFinal'
+    ? { grupos: gruposSaldo, ordenado: ordenar(gruposSaldo, 'saldoFinal'), resumo: resumoSaldo, notas: notasSaldo }
+    : { grupos: gruposCred, ordenado: ordenar(gruposCred, 'credito'), resumo: resumoCred, notas: notasCred };
+
   const { meta, warnings } = extractMetadata(found.balancete.pages, found.contaCorrente.pages);
 
-  logger.info('CONCILIAÇÃO', `Cruzamento concluído: ${grupos.batimentos.length} batimentos exatos, ${grupos.divergencias.length} divergências de valores, ${grupos.somenteBalCred.length} somente no Balancete.`);
-  logger.info('VALORES', `Totais apurados: Balancete ${fmtBRL(resumo.totBal)} | C/C ${fmtBRL(resumo.totCC)} | Diferença Global ${fmtBRL(resumo.difGlobal)} | Resíduo Matemático: ${fmtBRL(resumo.prova.residual)}`);
+  logger.info(
+    'CONCILIAÇÃO',
+    `Cruzamento concluído [Modo: ${activeModo}]: ${active.grupos.batimentos.length} batimentos exatos, ${active.grupos.divergencias.length} divergências de valores.`,
+  );
+  logger.info(
+    'VALORES',
+    `Totais apurados: Balancete ${fmtBRL(active.resumo.totBal)} | C/C ${fmtBRL(active.resumo.totCC)} | Diferença Global ${fmtBRL(active.resumo.difGlobal)} | Resíduo Matemático: ${fmtBRL(active.resumo.prova.residual)}`,
+  );
 
   // Verificações de integridade contra os totais impressos nos próprios relatórios
   const checks = [];
+
+  // Verificação da 4ª Coluna (Saldo Final)
+  const saldoFinalSum = sumSaldoFinal(bal.suppliers);
+  if (bal.totals) {
+    const ok = Math.abs(round2(saldoFinalSum - bal.totals.saldoFinal)) < 0.01;
+    const txt = ok
+      ? `Saldo Final extraído do Balancete (${fmtBRL(saldoFinalSum)}) confere com o total impresso.`
+      : `Saldo Final extraído (${fmtBRL(saldoFinalSum)}) difere do total impresso no Balancete (${fmtBRL(bal.totals.saldoFinal)}). Alguma linha pode não ter sido lida.`;
+    checks.push({ ok, texto: txt });
+    if (!ok) logger.warn('INTEGRIDADE', txt);
+  }
+
+  // Verificação da 3ª Coluna (Mov. Crédito)
   const credSum = sumCredito(bal.suppliers);
   if (bal.totals) {
     const ok = Math.abs(round2(credSum - bal.totals.credito)) < 0.01;
@@ -136,10 +169,10 @@ export async function analyze(files, pdfjs, opts = {}) {
     logger.warn('INTEGRIDADE', 'Total geral impresso não localizado no Conta Corrente.');
   }
 
-  const provaOk = Math.abs(resumo.prova.residual) < 0.01;
+  const provaOk = Math.abs(active.resumo.prova.residual) < 0.01;
   const provaTxt = provaOk
     ? 'Prova matemática: a soma dos grupos explica 100% da diferença global (resíduo R$ 0,00).'
-    : `Prova matemática: resíduo de ${fmtBRL(resumo.prova.residual)} não explicado.`;
+    : `Prova matemática: resíduo de ${fmtBRL(active.resumo.prova.residual)} não explicado.`;
   checks.push({ ok: provaOk, texto: provaTxt });
   if (!provaOk) logger.warn('PROVA_MATEMATICA', provaTxt);
 
@@ -163,9 +196,24 @@ export async function analyze(files, pdfjs, opts = {}) {
     checks,
     bal: bal.suppliers,
     cc: cc.suppliers,
-    grupos,
-    ordenado: ordenar(grupos),
-    resumo,
-    notas,
+    modo: activeModo,
+    grupos: active.grupos,
+    ordenado: active.ordenado,
+    resumo: active.resumo,
+    notas: active.notas,
+    modes: {
+      saldoFinal: {
+        grupos: gruposSaldo,
+        ordenado: ordenar(gruposSaldo, 'saldoFinal'),
+        resumo: resumoSaldo,
+        notas: notasSaldo,
+      },
+      credito: {
+        grupos: gruposCred,
+        ordenado: ordenar(gruposCred, 'credito'),
+        resumo: resumoCred,
+        notas: notasCred,
+      },
+    },
   };
 }
