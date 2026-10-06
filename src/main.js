@@ -1,4 +1,5 @@
 import './style.css';
+import { registerSW } from 'virtual:pwa-register';
 import { $, $$, h, clear, toast, fmtBytes } from './ui/dom.js';
 import { renderResults } from './ui/results.js';
 import { loadPdfjs } from './core/pdfBrowser.js';
@@ -7,6 +8,48 @@ import { detectKind, MESES } from './core/metadata.js';
 import { analyze, AppError } from './core/pipeline.js';
 import { DEFAULT_ACCOUNT } from './core/parseBalancete.js';
 import { buildWorkbook, nomeArquivo } from './export/excel.js';
+
+/* ------------------------------ PWA ------------------------------ */
+if ('serviceWorker' in navigator) {
+  const updateSW = registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      toast('Nova versão disponível! Atualizando…');
+      setTimeout(() => updateSW(true), 1200);
+    },
+    onOfflineReady() {
+      toast('Aplicativo pronto para uso offline!');
+    },
+  });
+}
+
+let deferredPrompt = null;
+const installBtn = $('#pwa-install-btn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (installBtn) installBtn.hidden = false;
+});
+
+if (installBtn) {
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      toast('Aplicativo ConFor instalado com sucesso!');
+    }
+    deferredPrompt = null;
+    installBtn.hidden = true;
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  if (installBtn) installBtn.hidden = true;
+  deferredPrompt = null;
+  toast('Aplicativo ConFor instalado!');
+});
 
 /* ------------------------------ Estado ------------------------------ */
 const state = {

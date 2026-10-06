@@ -203,6 +203,33 @@ button {
   color: #fff;
 }
 
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn--install {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--text));
+  background: hsl(var(--surface-2));
+  border: 1px solid hsl(var(--accent) / 0.4);
+  cursor: pointer;
+  transition: transform 0.2s var(--ease), background 0.2s, border-color 0.2s;
+}
+
+.btn--install:hover {
+  background: hsl(var(--accent) / 0.15);
+  border-color: hsl(var(--accent));
+  transform: translateY(-1px);
+}
+
 .icon-btn {
   display: grid;
   place-items: center;
