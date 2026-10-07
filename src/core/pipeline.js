@@ -203,12 +203,14 @@ export async function analyze(files, pdfjs, opts = {}) {
     notas: active.notas,
     modes: {
       saldoFinal: {
+        modo: 'saldoFinal',
         grupos: gruposSaldo,
         ordenado: ordenar(gruposSaldo, 'saldoFinal'),
         resumo: resumoSaldo,
         notas: notasSaldo,
       },
       credito: {
+        modo: 'credito',
         grupos: gruposCred,
         ordenado: ordenar(gruposCred, 'credito'),
         resumo: resumoCred,

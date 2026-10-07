@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Conciliação Contábil de Fornecedores | Balancete x Conta Corrente</title>
+    <title>ConFor — Conciliação Contábil de Fornecedores | Balancete x Conta Corrente</title>
     <meta
       name="description"
       content="Concilie o Balancete Analítico com o Conta Corrente de Fornecedores em segundos. Envie os PDFs, veja o diagnóstico das divergências e baixe a planilha Excel. Processamento 100% no seu navegador."
@@ -12,6 +12,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ConFor" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -35,7 +37,7 @@
 
     <header class="topbar">
       <div class="topbar__inner">
-        <a class="brand" href="/" aria-label="Conciliação Contábil, início">
+        <a class="brand" href="/" aria-label="ConFor, início">
           <span class="brand__mark" aria-hidden="true">
             <svg viewBox="0 0 32 32" width="22" height="22" fill="none">
               <path d="M6 8h20M6 16h12M6 24h20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
@@ -43,8 +45,8 @@
             </svg>
           </span>
           <span class="brand__text">
-            <strong>Conciliação Contábil</strong>
-            <small>Fornecedores</small>
+            <strong>ConFor</strong>
+            <small>Conciliação de Fornecedores</small>
           </span>
         </a>
 
@@ -226,6 +228,8 @@
               Baixar Excel
             </button>
           </div>
+        </div>
+
         <div class="result-mode-bar card card--mode">
           <div class="result-mode-bar__info">
             <span class="result-mode-bar__icon" aria-hidden="true">
@@ -268,7 +272,7 @@
 
         <div class="card card--table">
           <div class="tabs" id="tabs" role="tablist" aria-label="Detalhamento"></div>
-          <div id="table-host"></div>
+          <div id="table-host" role="tabpanel" aria-live="polite"></div>
         </div>
       </section>
 
@@ -277,7 +281,7 @@
     </main>
 
     <footer class="footer">
-      <span>Conciliação Contábil · Fornecedores</span>
+      <span>ConFor · Conciliação de Fornecedores</span>
       <span>Os dados não saem do seu computador.</span>
     </footer>
 

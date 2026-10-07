@@ -460,8 +460,10 @@ export function buildNotes(bal, cc, grupos, summary, opts = {}) {
       "Natureza da Conferência: Confronto direto entre a 4ª COLUNA DO BALANCETE (Saldo Final Contábil / Posição Acumulada em Aberto) e o SALDO CREDOR DO CONTA CORRENTE FORNECEDORES.",
     );
 
+    const totalComuns = c.batimentos + c.divergencias;
+    const pctComuns = totalComuns > 0 ? Math.round((c.batimentos / totalComuns) * 100) : 0;
     notas.push(
-      `Resultado Geral: De 152 fornecedores em comum, ${c.batimentos} (${Math.round((c.batimentos / 152) * 100)}%) apresentam BATIMENTO EXATO (100% de conferência no Saldo Final), demonstrando integridade entre o razão contábil e os títulos em aberto.`,
+      `Resultado Geral: De ${totalComuns} fornecedores em comum, ${c.batimentos} (${pctComuns}%) apresentam BATIMENTO EXATO (100% de conferência no Saldo Final), demonstrando integridade entre o razão contábil e os títulos em aberto.`,
     );
 
     if (c.divergencias > 0) {

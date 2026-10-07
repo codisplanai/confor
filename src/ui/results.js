@@ -23,6 +23,17 @@ const GRUPOS_SALDO_FINAL = [
 const nfInt = new Intl.NumberFormat('pt-BR');
 
 /* ------------------------------ KPIs ------------------------------ */
+const KPI_ICONS = {
+  balancete:
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  cc:
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+  diferenca:
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 7h18M6 7l-3 7h6L6 7zm12 0l-3 7h6l-3-7z"/></svg>',
+  batimentos:
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>',
+};
+
 function renderKpis(r) {
   const s = r.resumo;
   const isSaldo = (r.modo || 'saldoFinal') === 'saldoFinal';
@@ -32,31 +43,39 @@ function renderKpis(r) {
 
   const cards = [
     {
+      id: 'kpi-bal',
       label: isSaldo ? 'Saldo Final (4ª Coluna Balancete)' : 'Mov. Crédito (3ª Coluna Balancete)',
       value: fmtBRL(s.totBal),
       sub: `${nfInt.format(s.qtdFornecedores)} contas analíticas`,
       color: 'hsl(212 92% 58%)',
+      iconHtml: KPI_ICONS.balancete,
     },
     {
+      id: 'kpi-cc',
       label: 'Saldo Credor (Conta Corrente)',
       value: fmtBRL(s.totCC),
       sub: `${nfInt.format(s.qtdCC)} fornecedores`,
       color: 'hsl(262 70% 66%)',
+      iconHtml: KPI_ICONS.cc,
     },
     {
+      id: 'kpi-dif',
       label: 'Diferença global',
       value: fmtBRL(s.difGlobal),
       sub: isSaldo ? 'Saldo Final − Conta Corrente' : 'Mov. Crédito − Conta Corrente',
       color: Math.abs(s.difGlobal) < 0.01 ? 'hsl(152 62% 44%)' : 'hsl(352 78% 58%)',
+      iconHtml: KPI_ICONS.diferenca,
       seal: fechou
         ? { ok: true, text: '✓ Prova fecha em R$ 0,00' }
         : { ok: false, text: `Resíduo ${fmtBRL(s.prova.residual)}` },
     },
     {
+      id: 'kpi-bat',
       label: 'Batimentos exatos',
       value: `${nfInt.format(s.contagens.batimentos)} de ${nfInt.format(total)}`,
       sub: `${pct.toFixed(1).replace('.', ',')}% dos fornecedores`,
       color: 'hsl(152 62% 44%)',
+      iconHtml: KPI_ICONS.batimentos,
     },
   ];
 
@@ -65,8 +84,13 @@ function renderKpis(r) {
     host.append(
       h(
         'div',
-        { class: 'kpi', style: `--k:${c.color}; animation-delay:${i * 70}ms` },
-        h('div', { class: 'kpi__label' }, c.label),
+        { class: 'kpi', id: c.id, style: `--k:${c.color}; animation-delay:${i * 70}ms` },
+        h(
+          'div',
+          { class: 'kpi__top' },
+          h('div', { class: 'kpi__label' }, c.label),
+          h('div', { class: 'kpi__icon-box', html: c.iconHtml, 'aria-hidden': 'true' }),
+        ),
         h('div', { class: 'kpi__value' }, c.value),
         h('div', { class: 'kpi__sub' }, c.sub),
         c.seal ? h('span', { class: `kpi__seal ${c.seal.ok ? '' : 'kpi__seal--bad'}` }, c.seal.text) : null,
@@ -106,6 +130,7 @@ function renderDonut(r) {
     const c = document.createElementNS(NS, 'circle');
     Object.entries({
       class: 'seg',
+      'data-key': g.key,
       cx: 100,
       cy: 100,
       r: R,
@@ -119,7 +144,7 @@ function renderDonut(r) {
     t.textContent = `${g.label}: ${n}`;
     c.append(t);
     svg.append(c);
-    segs.push({ c, len: Math.max(len - 2, 0.5) });
+    segs.push({ c, key: g.key, len: Math.max(len - 2, 0.5) });
     offset += len;
   }
   requestAnimationFrame(() =>
@@ -133,13 +158,33 @@ function renderDonut(r) {
       .filter((g) => (r.grupos[g.key] || []).length > 0)
       .map((g) => {
         const n = (r.grupos[g.key] || []).length;
-        return h(
+        const item = h(
           'li',
-          {},
+          {
+            class: 'legend__item',
+            onmouseenter: () => {
+              segs.forEach(({ c, key }) => {
+                if (key === g.key) {
+                  c.style.strokeWidth = '28';
+                  c.style.filter = 'drop-shadow(0 0 6px currentColor)';
+                } else {
+                  c.style.opacity = '0.35';
+                }
+              });
+            },
+            onmouseleave: () => {
+              segs.forEach(({ c }) => {
+                c.style.strokeWidth = '22';
+                c.style.filter = '';
+                c.style.opacity = '1';
+              });
+            },
+          },
           h('span', { class: 'sw', style: `background:${g.color}` }),
-          g.label,
+          h('span', { class: 'legend__label' }, g.label),
           h('span', { class: 'n' }, nfInt.format(n)),
         );
+        return item;
       }),
   );
 
@@ -147,6 +192,33 @@ function renderDonut(r) {
     h('div', { class: 'donut' }, svg, h('div', { class: 'donut__center' }, h('strong', {}, nfInt.format(r.grupos.base.length)), h('small', {}, 'fornecedores'))),
     legend,
   );
+}
+
+/* ------------------------------ Notas Técnicas ------------------------------ */
+function renderNotes(r) {
+  const host = clear($('#notes'));
+  r.notas.forEach((nota, idx) => {
+    const parts = nota.split(': ');
+    let title = '';
+    let body = nota;
+    if (parts.length > 1) {
+      title = parts[0].trim();
+      body = parts.slice(1).join(': ').trim();
+    }
+    host.append(
+      h(
+        'li',
+        { class: 'note-card' },
+        h(
+          'div',
+          { class: 'note-card__header' },
+          h('span', { class: 'note-card__badge' }, String(idx + 1)),
+          title ? h('strong', { class: 'note-card__title' }, title) : null,
+        ),
+        h('p', { class: 'note-card__text' }, body),
+      ),
+    );
+  });
 }
 
 /* ------------------------------ Causas ------------------------------ */
@@ -299,20 +371,24 @@ function tabelas(r) {
   return tabs.map((t) => ({ ...t, searchKeys }));
 }
 
-function renderTabs(r) {
+let currentTabId = 'divergencias';
+
+function renderTabs(r, preferredId) {
   const tabs = tabelas(r);
   const bar = clear($('#tabs'));
   const host = clear($('#table-host'));
   const cache = new Map();
 
   const show = (id) => {
+    currentTabId = id;
     [...bar.children].forEach((b) => {
       const on = b.dataset.id === id;
       b.classList.toggle('is-active', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     clear(host);
-    if (!cache.has(id)) cache.set(id, createTable(tabs.find((t) => t.id === id)));
+    const targetTab = tabs.find((t) => t.id === id) || tabs[0];
+    if (!cache.has(id)) cache.set(id, createTable(targetTab));
     host.append(cache.get(id));
   };
 
@@ -326,11 +402,16 @@ function renderTabs(r) {
       ),
     ),
   );
-  show(tabs[0].id);
+  const targetId = tabs.some((t) => t.id === preferredId)
+    ? preferredId
+    : tabs.some((t) => t.id === currentTabId)
+      ? currentTabId
+      : tabs[0].id;
+  show(targetId);
 }
 
 /* ------------------------------ API ------------------------------ */
-export function renderResults(r, meta) {
+export function renderResults(r, meta, onModeChange) {
   const periodo = [meta.mes, meta.ano].filter(Boolean).join('/');
   $('#result-meta').textContent = [
     meta.empresa,
@@ -367,6 +448,9 @@ export function renderResults(r, meta) {
       r.resumo = target.resumo;
       r.notas = target.notas;
       logger.info('MODO', `Visualização alternada instantaneamente para: ${modo === 'saldoFinal' ? 'Saldo Final (4ª Coluna)' : 'Movimento Crédito (3ª Coluna)'}`);
+      if (typeof onModeChange === 'function') {
+        onModeChange(modo);
+      }
     }
 
     updateModeUI(r.modo || 'saldoFinal');
@@ -374,7 +458,7 @@ export function renderResults(r, meta) {
     renderDonut(r);
     renderCausas(r);
     clear($('#notes')).append(...r.notas.map((n) => h('li', {}, n)));
-    renderTabs(r);
+    renderTabs(r, currentTabId);
   }
 
   // Registra eventos no seletor de modalidade de Step 3

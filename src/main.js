@@ -82,16 +82,46 @@ $('#theme-toggle').addEventListener('click', () => {
 });
 
 /* ------------------------------ Navegação ------------------------------ */
+function updateStepperItems(currentStep) {
+  $$('.stepper__item').forEach((el) => {
+    const s = Number(el.dataset.step);
+    el.classList.toggle('is-active', s === currentStep);
+    el.classList.toggle('is-done', s < currentStep);
+    const isClickable = s === 1 || (s === 2 && Boolean(state.result)) || (s === 3 && Boolean(state.result && state.meta));
+    el.classList.toggle('is-clickable', isClickable);
+    el.setAttribute('tabindex', isClickable ? '0' : '-1');
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-current', s === currentStep ? 'step' : 'false');
+  });
+}
+
 function setStep(n) {
   const ids = { 1: 'step-upload', 2: 'step-review', 3: 'step-result' };
   Object.entries(ids).forEach(([k, id]) => $(`#${id}`).classList.toggle('is-active', Number(k) === n));
-  $$('.stepper__item').forEach((el) => {
-    const s = Number(el.dataset.step);
-    el.classList.toggle('is-active', s === n);
-    el.classList.toggle('is-done', s < n);
-  });
+  updateStepperItems(n);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+$$('.stepper__item').forEach((el) => {
+  const navigate = () => {
+    const s = Number(el.dataset.step);
+    if (s === 1) {
+      syncModeStep1();
+      setStep(1);
+    } else if (s === 2 && state.result) {
+      setStep(2);
+    } else if (s === 3 && state.result && state.meta) {
+      setStep(3);
+    }
+  };
+  el.addEventListener('click', navigate);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      navigate();
+    }
+  });
+});
 
 /* ------------------------------ Upload ------------------------------ */
 const dropzone = $('#dropzone');
@@ -193,11 +223,30 @@ function renderFiles() {
     );
   });
 
-  const has = (k) => state.files.some((f) => f.kind === k);
-  $('#expect-balancete').classList.toggle('is-found', has('balancete'));
-  $('#expect-cc').classList.toggle('is-found', has('contaCorrente'));
+  const getFile = (k) => state.files.find((f) => f.kind === k);
+  const balFile = getFile('balancete');
+  const ccFile = getFile('contaCorrente');
 
-  const ready = state.files.length === 2 && has('balancete') && has('contaCorrente');
+  const expB = $('#expect-balancete');
+  const expCc = $('#expect-cc');
+  expB.classList.toggle('is-found', Boolean(balFile));
+  expCc.classList.toggle('is-found', Boolean(ccFile));
+
+  const subB = expB.querySelector('small');
+  if (subB) {
+    subB.textContent = balFile
+      ? `✓ Identificado: ${balFile.file.name} (${fmtBytes(balFile.file.size)})`
+      : 'Relatório com Saldo Inicial, Mov. Débito, Mov. Crédito e Saldo Final';
+  }
+
+  const subCc = expCc.querySelector('small');
+  if (subCc) {
+    subCc.textContent = ccFile
+      ? `✓ Identificado: ${ccFile.file.name} (${fmtBytes(ccFile.file.size)})`
+      : 'Relatório "Saldo C/C Fornecedores do mês"';
+  }
+
+  const ready = state.files.length === 2 && Boolean(balFile) && Boolean(ccFile);
   $('#btn-process').disabled = !ready;
 
   const invalid = state.files.find((f) => f.kind === 'desconhecido');
@@ -264,6 +313,14 @@ $('#btn-process').addEventListener('click', async () => {
 const mesSelect = $('#meta-mes');
 mesSelect.append(h('option', { value: '' }, 'Selecione…'), ...MESES.map((m) => h('option', { value: m }, m)));
 
+const metaForm = $('#meta-form');
+if (metaForm) {
+  metaForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    $('#btn-continue').click();
+  });
+}
+
 function fillReview(r) {
   $('#meta-empresa').value = r.meta.empresa;
   $('#meta-codigo').value = r.meta.codigo;
@@ -282,7 +339,18 @@ function fillReview(r) {
   r.warnings.forEach((t) => w.append(h('div', { class: 'alert alert--warn' }, t)));
 }
 
-$('#btn-back').addEventListener('click', () => setStep(1));
+function syncModeStep1() {
+  modeCards.forEach((c) => {
+    const active = c.dataset.mode === state.selectedMode;
+    c.classList.toggle('is-active', active);
+    c.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+}
+
+$('#btn-back').addEventListener('click', () => {
+  syncModeStep1();
+  setStep(1);
+});
 
 $('#btn-continue').addEventListener('click', () => {
   const mes = $('#meta-mes').value;
@@ -299,7 +367,10 @@ $('#btn-continue').addEventListener('click', () => {
     emissao: $('#meta-emissao').value.trim(),
   };
   logger.info('METADADOS', `Metadados confirmados: ${state.meta.empresa} (${state.meta.mes}/${state.meta.ano})`);
-  renderResults(state.result, state.meta);
+  renderResults(state.result, state.meta, (novoModo) => {
+    state.selectedMode = novoModo;
+    syncModeStep1();
+  });
   setStep(3);
 });
 

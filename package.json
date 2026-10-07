@@ -1,9 +1,9 @@
 {
-  "name": "conciliacao-contabil",
+  "name": "confor",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Conciliação Contábil de Fornecedores: Balancete Analítico x Conta Corrente (processamento 100% no navegador)",
+  "description": "ConFor - Conciliação Contábil de Fornecedores: Balancete Analítico x Conta Corrente (processamento 100% no navegador)",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

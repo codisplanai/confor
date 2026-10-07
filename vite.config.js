@@ -17,7 +17,7 @@ export default defineConfig({
         'maskable-icon-512x512.png',
       ],
       manifest: {
-        name: 'Conciliação Contábil - Fornecedores',
+        name: 'ConFor — Conciliação Contábil de Fornecedores',
         short_name: 'ConFor',
         description:
           'Conciliação contábil entre Balancete Analítico e Conta Corrente de Fornecedores 100% no navegador.',

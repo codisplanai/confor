@@ -32,14 +32,14 @@ export function parseContaCorrente(pages) {
       const line = raw.trim();
       if (!line) continue;
 
-      if (line.includes('TOTAL GERAL')) {
-        const m = line.match(/TOTAL GERAL\s+(-?[\d.,]+)/);
-        if (m) totalGeral = parseBR(m[1]);
+      const mGeral = line.match(/TOTAL\s+GERAL[:\s]+(-?[\d.,]+)/i);
+      if (mGeral) {
+        totalGeral = parseBR(mGeral[1]);
         continue;
       }
-      if (line.includes('TOTAL MÊS')) {
-        const m = line.match(/TOTAL MÊS\s+(-?[\d.,]+)/);
-        if (m) totalMes += parseBR(m[1]);
+      const mMes = line.match(/TOTAL\s+M[ÊE]S[:\s]+(-?[\d.,]+)/i);
+      if (mMes) {
+        totalMes += parseBR(mMes[1]);
         continue;
       }
 

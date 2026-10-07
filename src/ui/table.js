@@ -1,5 +1,5 @@
 import { h, clear } from './dom.js';
-import { fmtBRL } from '../core/money.js';
+import { fmtBRL, round2 } from '../core/money.js';
 
 /**
  * Tabela com busca, filtro por lista, ordenação por coluna e rodapé de totais.
@@ -11,24 +11,71 @@ export function createTable(config) {
   const { rows, columns, searchKeys, filter, totals = [], totalLabel = 'Total' } = config;
   const state = { q: '', filterVal: '', sortKey: null, sortDir: 1 };
 
-  const search = h('input', {
-    class: 'input',
-    type: 'search',
+  const searchInput = h('input', {
+    class: 'input search-input',
+    type: 'text',
     placeholder: 'Buscar por código, nome ou CNPJ…',
     'aria-label': 'Buscar na tabela',
     oninput: (e) => {
       state.q = e.target.value;
+      clearBtn.hidden = !state.q;
       renderBody();
     },
   });
 
+  const clearBtn = h(
+    'button',
+    {
+      class: 'search-clear-btn',
+      type: 'button',
+      title: 'Limpar busca',
+      'aria-label': 'Limpar busca',
+      hidden: true,
+      onclick: () => {
+        searchInput.value = '';
+        state.q = '';
+        clearBtn.hidden = true;
+        renderBody();
+        searchInput.focus();
+      },
+    },
+    '×',
+  );
+
+  const searchBox = h(
+    'div',
+    { class: 'search-box' },
+    h(
+      'span',
+      { class: 'search-icon', 'aria-hidden': 'true' },
+      h(
+        'svg',
+        {
+          viewBox: '0 0 24 24',
+          width: '16',
+          height: '16',
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': '2.2',
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+        },
+        h('circle', { cx: '11', cy: '11', r: '8' }),
+        h('line', { x1: '21', y1: '21', x2: '16.65', y2: '16.65' }),
+      ),
+    ),
+    searchInput,
+    clearBtn,
+  );
+
   let select = null;
   if (filter) {
-    const options = [...new Set(rows.map(filter.get))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const rawOptions = rows.map(filter.get).filter((v) => v !== undefined && v !== null && v !== '');
+    const options = [...new Set(rawOptions)].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
     select = h(
       'select',
       {
-        class: 'input',
+        class: 'input select-input',
         'aria-label': filter.label,
         onchange: (e) => {
           state.filterVal = e.target.value;
@@ -53,10 +100,11 @@ export function createTable(config) {
         'tr',
         {},
         columns.map((c) => {
+          const isSorted = state.sortKey === c.key;
           const th = h(
             'th',
             {
-              class: c.kind === 'money' ? 'num' : '',
+              class: `${c.kind === 'money' ? 'num' : ''} ${isSorted ? 'is-sorted' : ''}`.trim(),
               scope: 'col',
               title: 'Clique para ordenar',
               onclick: () => {
@@ -70,7 +118,7 @@ export function createTable(config) {
               },
             },
             c.label,
-            h('span', { class: 'arrow' }, state.sortKey === c.key ? (state.sortDir === 1 ? ' ▲' : ' ▼') : ''),
+            h('span', { class: 'arrow' }, isSorted ? (state.sortDir === 1 ? ' ▲' : ' ▼') : ''),
           );
           return th;
         }),
@@ -116,7 +164,58 @@ export function createTable(config) {
     clear(tfoot);
 
     if (!list.length) {
-      tbody.append(h('tr', {}, h('td', { colspan: columns.length, class: 'table-empty' }, 'Nenhum registro encontrado.')));
+      const isFiltered = Boolean(state.q || state.filterVal);
+      const emptyContent = h(
+        'div',
+        { class: 'table-empty' },
+        h(
+          'div',
+          { class: 'table-empty__icon', 'aria-hidden': 'true' },
+          h(
+            'svg',
+            {
+              viewBox: '0 0 24 24',
+              width: '36',
+              height: '36',
+              fill: 'none',
+              stroke: 'currentColor',
+              'stroke-width': '1.8',
+              'stroke-linecap': 'round',
+              'stroke-linejoin': 'round',
+            },
+            h('circle', { cx: '11', cy: '11', r: '8' }),
+            h('line', { x1: '21', y1: '21', x2: '16.65', y2: '16.65' }),
+            h('line', { x1: '8', y1: '11', x2: '14', y2: '11' }),
+          ),
+        ),
+        h('p', { class: 'table-empty__title' }, isFiltered ? 'Nenhum registro encontrado' : 'Nenhum registro nesta categoria'),
+        h(
+          'p',
+          { class: 'table-empty__desc' },
+          isFiltered
+            ? 'Tente ajustar os termos da busca ou redefinir os filtros aplicados.'
+            : 'Não constam fornecedores listados com esta classificação.',
+        ),
+        isFiltered
+          ? h(
+              'button',
+              {
+                class: 'btn btn--ghost btn--sm table-empty__btn',
+                type: 'button',
+                onclick: () => {
+                  state.q = '';
+                  state.filterVal = '';
+                  searchInput.value = '';
+                  clearBtn.hidden = true;
+                  if (select) select.value = '';
+                  renderBody();
+                },
+              },
+              'Limpar busca e filtros',
+            )
+          : null,
+      );
+      tbody.append(h('tr', {}, h('td', { colspan: columns.length, class: 'table-empty-cell' }, emptyContent)));
     } else {
       const frag = document.createDocumentFragment();
       for (const r of list) frag.append(h('tr', {}, columns.map((c) => cell(c, r))));
@@ -128,7 +227,7 @@ export function createTable(config) {
       let labeled = false;
       columns.forEach((c) => {
         if (totals.includes(c.key)) {
-          const s = list.reduce((t, r) => t + (r[c.key] || 0), 0);
+          const s = round2(list.reduce((t, r) => t + (Number(r[c.key]) || 0), 0));
           tr.append(h('td', { class: 'num' }, fmtBRL(s)));
         } else if (!labeled) {
           tr.append(h('td', {}, state.q || state.filterVal ? `${totalLabel} (filtrado)` : totalLabel));
@@ -144,10 +243,25 @@ export function createTable(config) {
   renderHead();
   renderBody();
 
+  const scrollHint = h(
+    'div',
+    { class: 'table-scroll-hint', 'aria-hidden': 'true' },
+    h(
+      'svg',
+      { viewBox: '0 0 24 24', width: '14', height: '14', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+      h('path', { d: 'M18 8L22 12L18 16' }),
+      h('path', { d: 'M6 8L2 12L6 16' }),
+      h('path', { d: 'M2 12H22' }),
+    ),
+    h('span', {}, 'Deslize horizontalmente para visualizar todas as colunas'),
+  );
+
   return h(
     'div',
-    {},
-    h('div', { class: 'toolbar' }, search, select, count),
+    { class: 'table-container' },
+    h('div', { class: 'toolbar' }, searchBox, select, count),
+    scrollHint,
     h('div', { class: 'table-scroll' }, table),
   );
 }
+

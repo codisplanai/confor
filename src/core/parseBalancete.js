@@ -25,18 +25,18 @@ export function parseBalancete(pages, opts = {}) {
       const line = raw.trim();
       if (!line) continue;
 
-      if (line.includes(account) && line.includes('FORNECEDORES') && !/^\d{5}-\d\s+\d+\s+\d{10}/.test(line)) {
+      if (line.includes(account) && /FORNECEDOR/i.test(line) && !/^\d{5}-\d\s+\d+\s+\d{10}/.test(line)) {
         capturing = true;
         groupFound = true;
         continue;
       }
 
-      if (line.includes(`TOTAL DA CONTA ${account}`)) {
+      if (/TOTAL\s+DA\s+CONTA/i.test(line) && line.includes(account)) {
         capturing = false;
         // Ex: TOTAL DA CONTA 2101010000 2.829.760,20 C 2.259.149,72 2.309.729,62 2.880.340,10 C
         const tail = line.slice(line.indexOf(account) + account.length).trim();
         const m = tail.match(
-          /^([\d.,]+(?:\s+[CD])?)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+(?:\s+[CD])?)$/,
+          /([\d.,]+(?:\s+[CD])?)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+(?:\s+[CD])?)$/,
         );
         if (m) {
           totals = {

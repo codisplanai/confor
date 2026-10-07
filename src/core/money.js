@@ -9,19 +9,30 @@ export function round2(n) {
   return (sign * Math.round(Math.abs(n) * 100 + 1e-9)) / 100;
 }
 
-/** Converte "1.234,56" em 1234.56. */
+/** Converte "1.234,56", "(1.234,56)", "R$ 1.234,56", etc. em número float. */
 export function parseBR(str) {
-  return Number(String(str).replace(/\./g, '').replace(',', '.'));
+  if (str === null || str === undefined) return 0;
+  let s = String(str).trim();
+  if (!s) return 0;
+  const isNeg = (s.startsWith('(') && s.endsWith(')')) || s.startsWith('-');
+  s = s.replace(/[()R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+  const n = Number(s);
+  if (isNaN(n)) return 0;
+  return isNeg ? -Math.abs(n) : n;
 }
 
 /**
- * Converte um valor do balancete, com sufixo opcional C/D.
+ * Converte um valor do balancete, com sufixo opcional C/D (com ou sem espaço).
  * Saldo devedor (D) vira negativo, como no script original.
  */
 export function parseSaldo(str) {
-  const parts = String(str).trim().split(/\s+/);
-  const n = parseBR(parts[0]);
-  return parts[1] === 'D' ? -n : n;
+  if (str === null || str === undefined) return 0;
+  const s = String(str).trim();
+  if (!s) return 0;
+  const isDevedor = /D$/i.test(s);
+  const clean = s.replace(/[CDcd]$/i, '').trim();
+  const n = parseBR(clean);
+  return isDevedor ? -Math.abs(n) : n;
 }
 
 const nf = new Intl.NumberFormat('pt-BR', {

@@ -126,128 +126,152 @@ export function initLoggerView() {
     btnToggle.classList.toggle('is-open', isOpen);
     if (!isOpen) return;
 
-    const snap = logger.getSnapshot();
-    clear(drawerHost);
+    updateDrawerContent();
+  }
 
-    // Barra de ferramentas do console
-    const searchInput = h('input', {
-      class: 'input input--sm input--mono',
-      type: 'search',
-      placeholder: 'Filtrar por mensagem, tag ou erro…',
-      value: searchTerm,
-      oninput: (e) => {
-        searchTerm = e.target.value.toLowerCase();
-        renderLogLines();
-      },
-    });
+  // Elementos persistentes da barra de ferramentas do console
+  const expandedIds = new Set();
+  const searchInput = h('input', {
+    class: 'input input--sm input--mono',
+    type: 'search',
+    placeholder: 'Filtrar por mensagem, tag ou erro…',
+    value: searchTerm,
+    oninput: (e) => {
+      searchTerm = e.target.value.toLowerCase();
+      renderLogLines();
+    },
+  });
 
-    const filterAll = h('button', { class: `pill-btn ${activeFilter === 'all' ? 'is-active' : ''}`, onclick: () => setFilter('all') }, `Todos (${snap.counts.total})`);
-    const filterErr = h('button', { class: `pill-btn pill-btn--err ${activeFilter === 'error' ? 'is-active' : ''}`, onclick: () => setFilter('error') }, `Erros (${snap.counts.errors})`);
-    const filterWarn = h('button', { class: `pill-btn pill-btn--warn ${activeFilter === 'warn' ? 'is-active' : ''}`, onclick: () => setFilter('warn') }, `Avisos (${snap.counts.warns})`);
-    const filterInfo = h('button', { class: `pill-btn ${activeFilter === 'info' ? 'is-active' : ''}`, onclick: () => setFilter('info') }, `Info (${snap.counts.info + snap.counts.success})`);
+  const filterAll = h('button', { class: 'pill-btn is-active', type: 'button', onclick: () => setFilter('all') }, 'Todos (0)');
+  const filterErr = h('button', { class: 'pill-btn pill-btn--err', type: 'button', onclick: () => setFilter('error') }, 'Erros (0)');
+  const filterWarn = h('button', { class: 'pill-btn pill-btn--warn', type: 'button', onclick: () => setFilter('warn') }, 'Avisos (0)');
+  const filterInfo = h('button', { class: 'pill-btn', type: 'button', onclick: () => setFilter('info') }, 'Info (0)');
 
-    const btnCopy = h(
-      'button',
-      {
-        class: 'btn btn--ghost btn--sm',
-        title: 'Copiar todo o diagnóstico para a área de transferência',
-        onclick: async () => {
-          try {
-            await navigator.clipboard.writeText(logger.exportText());
-            toast('Diagnóstico copiado para a área de transferência!');
-          } catch {
-            toast('Não foi possível copiar automaticamente.', true);
-          }
-        },
-      },
-      h(
-        'svg',
-        { viewBox: '0 0 24 24', width: '14', height: '14', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
-        h('rect', { x: '9', y: '9', width: '13', height: '13', rx: '2' }),
-        h('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }),
-      ),
-      h('span', {}, 'Copiar diagnóstico'),
-    );
-
-    const logList = h('div', { class: 'terminal-logs', role: 'log' });
-
-    function setFilter(lvl) {
-      activeFilter = lvl;
-      renderDrawer();
-    }
-
-    function renderLogLines() {
-      clear(logList);
-      let items = snap.entries;
-
-      if (activeFilter !== 'all') {
-        if (activeFilter === 'info') items = items.filter((x) => x.level === 'info' || x.level === 'success');
-        else items = items.filter((x) => x.level === activeFilter);
-      }
-
-      if (searchTerm) {
-        items = items.filter(
-          (x) =>
-            x.message.toLowerCase().includes(searchTerm) ||
-            x.tag.toLowerCase().includes(searchTerm) ||
-            (x.details && JSON.stringify(x.details).toLowerCase().includes(searchTerm)),
-        );
-      }
-
-      if (!items.length) {
-        logList.append(h('div', { class: 'terminal-empty' }, 'Nenhum registro encontrado para este filtro.'));
-        return;
-      }
-
-      for (const item of items) {
-        const timeStr = item.timestamp.toTimeString().split(' ')[0] + '.' + String(item.timestamp.getMilliseconds()).padStart(3, '0');
-        const hasDetails = Boolean(item.details);
-        let detailEl = null;
-
-        if (hasDetails) {
-          const formatted = JSON.stringify(item.details, null, 2);
-          detailEl = h('pre', { class: 'terminal-line__details', hidden: true }, formatted);
+  const btnCopy = h(
+    'button',
+    {
+      class: 'btn btn--ghost btn--sm',
+      type: 'button',
+      title: 'Copiar todo o diagnóstico para a área de transferência',
+      onclick: async () => {
+        try {
+          await navigator.clipboard.writeText(logger.exportText());
+          toast('Diagnóstico copiado para a área de transferência!');
+        } catch {
+          toast('Não foi possível copiar automaticamente.', true);
         }
+      },
+    },
+    h(
+      'svg',
+      { viewBox: '0 0 24 24', width: '14', height: '14', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' },
+      h('rect', { x: '9', y: '9', width: '13', height: '13', rx: '2' }),
+      h('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }),
+    ),
+    h('span', {}, 'Copiar diagnóstico'),
+  );
 
-        const line = h(
-          'div',
-          { class: `terminal-line terminal-line--${item.level}` },
-          h('span', { class: 'terminal-time' }, timeStr),
-          h('span', { class: `terminal-badge terminal-badge--${item.level}` }, item.level.toUpperCase()),
-          h('span', { class: 'terminal-tag' }, `[${item.tag}]`),
-          h('span', { class: 'terminal-msg' }, item.message),
-          hasDetails
-            ? h(
-                'button',
-                {
-                  class: 'terminal-expand-btn',
-                  type: 'button',
-                  title: 'Ver detalhes do evento',
-                  onclick: () => {
-                    detailEl.hidden = !detailEl.hidden;
-                  },
-                },
-                '{…}',
-              )
-            : null,
-          detailEl,
-        );
+  const logList = h('div', { class: 'terminal-logs', role: 'log' });
 
-        logList.append(line);
-      }
-    }
+  drawerHost.append(
+    h(
+      'div',
+      { class: 'drawer-toolbar' },
+      h('div', { class: 'drawer-filters' }, filterAll, filterErr, filterWarn, filterInfo),
+      h('div', { class: 'drawer-actions' }, searchInput, btnCopy),
+    ),
+    logList,
+  );
+
+  function setFilter(lvl) {
+    activeFilter = lvl;
+    updateDrawerContent();
+  }
+
+  function updateDrawerContent() {
+    const snap = logger.getSnapshot();
+    filterAll.textContent = `Todos (${snap.counts.total})`;
+    filterErr.textContent = `Erros (${snap.counts.errors})`;
+    filterWarn.textContent = `Avisos (${snap.counts.warns})`;
+    filterInfo.textContent = `Info (${snap.counts.info + snap.counts.success})`;
+
+    filterAll.className = `pill-btn ${activeFilter === 'all' ? 'is-active' : ''}`;
+    filterErr.className = `pill-btn pill-btn--err ${activeFilter === 'error' ? 'is-active' : ''}`;
+    filterWarn.className = `pill-btn pill-btn--warn ${activeFilter === 'warn' ? 'is-active' : ''}`;
+    filterInfo.className = `pill-btn ${activeFilter === 'info' ? 'is-active' : ''}`;
 
     renderLogLines();
+  }
 
-    drawerHost.append(
-      h(
+  function renderLogLines() {
+    clear(logList);
+    const snap = logger.getSnapshot();
+    let items = snap.entries;
+
+    if (activeFilter !== 'all') {
+      if (activeFilter === 'info') items = items.filter((x) => x.level === 'info' || x.level === 'success');
+      else items = items.filter((x) => x.level === activeFilter);
+    }
+
+    if (searchTerm) {
+      items = items.filter(
+        (x) =>
+          x.message.toLowerCase().includes(searchTerm) ||
+          x.tag.toLowerCase().includes(searchTerm) ||
+          (x.details && JSON.stringify(x.details).toLowerCase().includes(searchTerm)),
+      );
+    }
+
+    if (!items.length) {
+      logList.append(h('div', { class: 'terminal-empty' }, 'Nenhum registro encontrado para este filtro.'));
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const item of items) {
+      const timeStr = item.timestamp.toTimeString().split(' ')[0] + '.' + String(item.timestamp.getMilliseconds()).padStart(3, '0');
+      const hasDetails = Boolean(item.details);
+      const isExpanded = expandedIds.has(item.id);
+      let detailEl = null;
+
+      if (hasDetails) {
+        const formatted = JSON.stringify(item.details, null, 2);
+        detailEl = h('pre', { class: 'terminal-line__details', hidden: !isExpanded }, formatted);
+      }
+
+      const line = h(
         'div',
-        { class: 'drawer-toolbar' },
-        h('div', { class: 'drawer-filters' }, filterAll, filterErr, filterWarn, filterInfo),
-        h('div', { class: 'drawer-actions' }, searchInput, btnCopy),
-      ),
-      logList,
-    );
+        { class: `terminal-line terminal-line--${item.level}` },
+        h('span', { class: 'terminal-time' }, timeStr),
+        h('span', { class: `terminal-badge terminal-badge--${item.level}` }, item.level.toUpperCase()),
+        h('span', { class: 'terminal-tag' }, `[${item.tag}]`),
+        h('span', { class: 'terminal-msg' }, item.message),
+        hasDetails
+          ? h(
+              'button',
+              {
+                class: 'terminal-expand-btn',
+                type: 'button',
+                title: 'Ver detalhes do evento',
+                onclick: () => {
+                  if (expandedIds.has(item.id)) {
+                    expandedIds.delete(item.id);
+                    if (detailEl) detailEl.hidden = true;
+                  } else {
+                    expandedIds.add(item.id);
+                    if (detailEl) detailEl.hidden = false;
+                  }
+                },
+              },
+              '{…}',
+            )
+          : null,
+        detailEl,
+      );
+
+      frag.append(line);
+    }
+    logList.append(frag);
   }
 
   // Assina alterações no logger para sincronizar a UI em tempo real

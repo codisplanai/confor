@@ -36,6 +36,7 @@ export function clear(el) {
 
 export function toast(msg, isError = false) {
   const t = $('#toast');
+  if (!t) return;
   t.textContent = msg;
   t.classList.toggle('is-error', isError);
   t.hidden = false;

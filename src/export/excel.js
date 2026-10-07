@@ -185,6 +185,7 @@ export function buildWorkbook(ExcelJS, r, meta) {
 
   // Dados do modo Saldo Final (padrão primário)
   const modeSaldo = r.modes?.saldoFinal || {
+    modo: 'saldoFinal',
     grupos: r.grupos,
     ordenado: r.ordenado,
     resumo: r.resumo,
@@ -193,11 +194,15 @@ export function buildWorkbook(ExcelJS, r, meta) {
 
   // Dados do modo Movimento Crédito
   const modeCred = r.modes?.credito || {
+    modo: 'credito',
     grupos: r.grupos,
     ordenado: r.ordenado,
     resumo: r.resumo,
     notas: r.notas,
   };
+
+  const isSaldo = (r.modo || 'saldoFinal') === 'saldoFinal';
+  const activeMode = isSaldo ? modeSaldo : modeCred;
 
   // ----------------------------------------------------
   // ABA 1: RESUMO SALDO FINAL (4ª COLUNA)
@@ -225,8 +230,6 @@ export function buildWorkbook(ExcelJS, r, meta) {
     modeCred.grupos.divergencias.length,
   );
 
-  // Seleciona os grupos ordenados para as abas analíticas (baseados na modalidade ativa)
-  const activeMode = r.modo === 'credito' ? modeCred : modeSaldo;
   const { divergencias, batimentos, somenteBalCredor, somenteBalDevedor, somenteBalZerado, somenteBalCred } = activeMode.ordenado;
   const base = activeMode.grupos.base;
 
@@ -234,12 +237,14 @@ export function buildWorkbook(ExcelJS, r, meta) {
   // ABA 3: DIVERGÊNCIAS DE VALORES (com todas as 4 colunas)
   // ----------------------------------------------------
   const ws2 = wb.addWorksheet(sheetName('Divergências de Valores', divergencias.length));
+  const col9Label = isSaldo ? 'Diferença (Saldo Final - CC)' : 'Diferença (Mov. Crédito - CC)';
+  const col10Label = isSaldo ? 'Diferença vs Mov. Crédito' : 'Diferença vs Saldo Final';
   headerRow(
     ws2,
     [
       'Código Terc', 'CNPJ / CPF', 'Razão Social Fornecedor',
       'Balancete Saldo Inicial', 'Balancete Mov. Débito', 'Balancete Mov. Crédito', 'Balancete Saldo Final (4ª Col)',
-      'Conta Corrente Saldo Credor', 'Diferença (Saldo Final - CC)', 'Diferença vs Mov. Crédito',
+      'Conta Corrente Saldo Credor', col9Label, col10Label,
       'Diagnóstico Contábil da Divergência',
     ],
     [14, 20, 35, 18, 18, 18, 18, 18, 18, 18, 48],
@@ -257,13 +262,11 @@ export function buildWorkbook(ExcelJS, r, meta) {
     put(ws2, rr, 7, d.fim, { fmt: FMT_MOEDA });
     put(ws2, rr, 8, d.ccVal, { fmt: FMT_MOEDA });
 
-    // Diferença Saldo Final x CC
-    const difSF = round2(d.fim - d.ccVal);
-    put(ws2, rr, 9, difSF, { fmt: FMT_MOEDA, font: F.bold, fill: Math.abs(difSF) > 0.01 ? FILL.diff : FILL.ok });
+    const difPrincipal = isSaldo ? round2(d.fim - d.ccVal) : round2(d.balCred - d.ccVal);
+    const difSecundaria = isSaldo ? round2(d.balCred - d.ccVal) : round2(d.fim - d.ccVal);
 
-    // Diferença Mov Crédito x CC
-    const difCred = round2(d.balCred - d.ccVal);
-    put(ws2, rr, 10, difCred, { fmt: FMT_MOEDA });
+    put(ws2, rr, 9, difPrincipal, { fmt: FMT_MOEDA, font: F.bold, fill: Math.abs(difPrincipal) > 0.01 ? FILL.diff : FILL.ok });
+    put(ws2, rr, 10, difSecundaria, { fmt: FMT_MOEDA });
 
     const cDiag = put(ws2, rr, 11, d.diag, { font: F.regular });
     if (d.tag === 'exato') cDiag.fill = FILL.ok;
@@ -283,8 +286,8 @@ export function buildWorkbook(ExcelJS, r, meta) {
       6: colSum(divergencias, (x) => x.balCred),
       7: colSum(divergencias, (x) => x.fim),
       8: colSum(divergencias, (x) => x.ccVal),
-      9: colSum(divergencias, (x) => round2(x.fim - x.ccVal)),
-      10: colSum(divergencias, (x) => round2(x.balCred - x.ccVal)),
+      9: colSum(divergencias, (x) => isSaldo ? round2(x.fim - x.ccVal) : round2(x.balCred - x.ccVal)),
+      10: colSum(divergencias, (x) => isSaldo ? round2(x.balCred - x.ccVal) : round2(x.fim - x.ccVal)),
     };
     totalRow(ws2, rt, {
       label: 'TOTAL DIVERGÊNCIAS',
@@ -352,9 +355,9 @@ export function buildWorkbook(ExcelJS, r, meta) {
   // ABA 5: SOMENTE NO BALANCETE
   // ----------------------------------------------------
   const listaSomenteBal =
-    activeMode.modo === 'saldoFinal'
+    isSaldo
       ? [...(somenteBalCredor || []), ...(somenteBalDevedor || []), ...(somenteBalZerado || [])]
-      : somenteBalCred;
+      : (somenteBalCred || []);
 
   const ws3 = wb.addWorksheet(sheetName('Somente no Balancete', listaSomenteBal.length));
   headerRow(
@@ -396,6 +399,42 @@ export function buildWorkbook(ExcelJS, r, meta) {
       lastCol: 7,
       sumCols: [3, 4, 5, 6],
       values: v,
+      fill: FILL.azulClaro,
+    });
+  }
+
+  // ----------------------------------------------------
+  // ABA: SOMENTE NO CONTA CORRENTE (se houver)
+  // ----------------------------------------------------
+  if (activeMode.grupos.somenteCC && activeMode.grupos.somenteCC.length > 0) {
+    const listaSomenteCC = activeMode.grupos.somenteCC;
+    const wsCC = wb.addWorksheet(sheetName('Somente no Conta Corrente', listaSomenteCC.length));
+    headerRow(
+      wsCC,
+      ['Código Terc', 'CNPJ / CPF', 'Razão Social Fornecedor', 'Saldo Credor Conta Corrente'],
+      [14, 20, 38, 20],
+      FILL.navy,
+    );
+    listaSomenteCC.forEach((cItem, i) => {
+      const rr = i + 2;
+      put(wsCC, rr, 1, cItem.cod, { align: ALIGN.center });
+      put(wsCC, rr, 2, cItem.cnpj, { align: ALIGN.center });
+      put(wsCC, rr, 3, cItem.nome, { align: ALIGN.left });
+      put(wsCC, rr, 4, cItem.ccVal, { fmt: FMT_MOEDA });
+      for (let c = 1; c <= 4; c++) {
+        const cell = wsCC.getCell(rr, c);
+        cell.border = BORDER.thin;
+        if (rr % 2 === 1) cell.fill = FILL.zebra;
+      }
+    });
+    const rtCC = listaSomenteCC.length + 2;
+    const vCC = { 4: colSum(listaSomenteCC, (x) => x.ccVal) };
+    totalRow(wsCC, rtCC, {
+      label: 'TOTAL SOMENTE NO CONTA CORRENTE',
+      mergeTo: 3,
+      lastCol: 4,
+      sumCols: [4],
+      values: vCC,
       fill: FILL.azulClaro,
     });
   }
