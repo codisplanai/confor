@@ -1,11 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2F5C9E" />
-      <stop offset="1" stop-color="#1B365D" />
+    <linearGradient id="cf-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#020617" />
     </linearGradient>
+    <linearGradient id="cf-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F2FE" />
+      <stop offset="100%" stop-color="#00F5A0" />
+    </linearGradient>
+    <filter id="cf-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.2" flood-color="#00F2FE" flood-opacity="0.5" />
+    </filter>
   </defs>
-  <rect width="32" height="32" rx="8" fill="url(#g)" />
-  <path d="M7 10h18M7 16h11M7 22h18" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none" />
-  <circle cx="24" cy="16" r="3" fill="#6FD3C0" />
+  <rect width="32" height="32" rx="8" fill="url(#cf-bg)" stroke="#334155" stroke-width="0.8" />
+  <!-- Letra C -->
+  <path d="M 14.5 10.5 A 6.5 6.5 0 1 0 14.5 21.5" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" fill="none" />
+  <!-- Letra F com corte assinatura 45° e gradiente -->
+  <g filter="url(#cf-glow)">
+    <path d="M 17 8.5 L 26.5 8.5 L 28.5 10.5 L 28.5 11 L 19.8 11 L 19.8 14.5 L 26 14.5 L 26 17 L 19.8 17 L 19.8 23.5 L 17 23.5 Z" fill="url(#cf-grad)" />
+  </g>
 </svg>
